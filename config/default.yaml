@@ -1,0 +1,129 @@
+# Default configuration of the DR-MORL carbon-pricing experiments.
+# Every value marked "paper" is taken from Table 1 / Section 5 of the manuscript.
+# Values marked "assumed" are not reported in the manuscript and are fixed here
+# so that the experiment is fully specified.
+
+seed: 20261012                 # master seed (assumed)
+
+economy:                       # Table 1 (paper)
+  T: 30                        # planning horizon 2025-2054
+  start_year: 2025
+  Y0: 18.0                     # trillion USD
+  sigma0: 0.60                 # GtCO2 per trillion USD (= 0.60 kg/USD)
+  g_floor: 0.025               # trend growth  g_t = 2.5% + 2.3% exp(-t/12)
+  g_amp: 0.023
+  g_tau: 12.0
+  g_sigma: 0.022               # autonomous decarbonisation rate
+  Pb0: 550.0                   # initial backstop price, USD/t
+  tau_b: 0.025                 # trend decline of the backstop price
+  theta2: 2.6                  # abatement-cost exponent
+  phi: 0.25                    # persistence of abatement cost in output
+  p_init: 12.0                 # p_{-1}, USD/t
+  p_max: 300.0                 # price ceiling
+  dp_max: 30.0                 # maximum annual revision
+  budget: 290.0                # B, Gt
+  delta: 1.0                   # overshoot tolerance, Gt
+  gamma: 0.97                  # discount factor
+  H: 8.0                       # terminal-cost multiplier
+
+weights: [0.2, 0.7, 0.1]       # w = (emissions, output loss, volatility)
+
+risk:                          # DR-MORL defaults (paper)
+  eps: 0.10                    # Wasserstein radius, standardised units
+  alpha: 0.90                  # CVaR level
+  kappa: 0.50                  # CVaR weight
+
+shocks:                        # nominal data-generating process, Section 5.2
+  N: 30                        # length of the observed record (paper)
+  M: 60                        # candidate atoms (paper)
+  perturb_sd: 1.2              # std of the Gaussian perturbation of extra atoms (paper)
+  g_sd: 0.010                  # sd of growth innovation inside a regime   (assumed)
+  rec_shift: 0.039             # growth drop in a recession                (paper: ~3.9 pp)
+  rec_prob: 0.10               # recession probability                     (paper)
+  d_sd: 0.022                  # energy demand sd, Student-t(5)            (paper)
+  d_df: 5.0
+  b_sd: 0.012                  # technology innovation sd, Gaussian        (paper)
+  iota_sd: 0.012               # intensity innovation sd                   (paper)
+  rho: 0.45                    # corr(intensity, demand)                   (paper)
+  clip:                        # bounded support Xi (assumed)
+    g: [-0.15, 0.15]
+    d: [-0.20, 0.20]
+    b: [-0.05, 0.05]
+    iota: [-0.10, 0.10]
+
+scenarios:                     # Table 2 (paper); order of components: (g, d, b, iota)
+  S1:
+    label: Nominal
+  S2:
+    label: Heavy-tailed
+    rec_prob: 0.18
+    d_df: 2.3
+    iota_df: 2.3
+  S3:
+    label: Adverse shift
+    mean_shift: [0.004, 0.025, -0.006, 0.004]
+  S4:
+    label: High volatility
+    scale: 1.7
+  S5:
+    label: Regime switching
+    regime:
+      enter: 0.12
+      stay: 0.60
+      shift: [-0.035, 0.025, -0.012, 0.006]
+
+algo:
+  n_s: 600                     # training states per stage (paper)
+  n_actions: 25                # action grid (paper)
+  K_eta: 8                     # grid size for eta (paper)
+  K_lam: 14                    # grid size for lambda (paper)
+  eta_levels: [0.5, 1.0]       # empirical quantile levels of the eta grid  (assumed)
+  lam_log10: [-2.0, 1.0]       # log10 range of lambda / spread of targets  (assumed)
+  ridge: 1.0e-5                # varsigma in Eq. (ridge)                    (assumed)
+  sp_scenarios: 60             # sampled scenarios per stage for SP (paper)
+
+dual:                          # primal-dual loop for the budget multiplier (paper)
+  K_nu: 6
+  beta: 0.10
+  nu0: 0.40
+  n_sim: 2000                  # trajectories used to estimate G-hat       (assumed)
+
+eval:
+  n_traj: 2000                 # trajectories per scenario (paper)
+  cvar_level: 0.95             # CVaR level of the reported measures (paper)
+  year_marks: [2030, 2040, 2054]
+
+pareto:
+  w1: [0.04, 0.08, 0.12, 0.16, 0.20, 0.26, 0.34, 0.44, 0.56]
+  w3: 0.10                     # w2 = 0.9 - w1
+  methods: [DET, SP, RL, DRMORL]
+  scenarios: [S1, S3, S4]
+
+sens:
+  eps: [0.0, 0.025, 0.05, 0.1, 0.2, 0.4, 0.8]
+  alpha: [0.75, 0.85, 0.90, 0.95]
+  kappa: [0.0, 0.25, 0.5, 0.75, 1.0]
+
+sample:
+  N: [10, 20, 30, 50, 80]
+  n_records: 3
+  eps_ref_N: 30                # eps_N = eps * sqrt(30 / N)  (Remark on the radius)
+  extra_atoms: 30              # M = max(M, N + extra_atoms)  (assumed)
+  methods: [SP, RL, DRMORL]
+  n_s: [150, 300, 600, 1200]
+  n_seeds: 3
+
+policy_map:                    # data for the feedback-rule map in 2035
+  year: 2035
+  p_prev: 70.0
+  gap: [-40.0, 40.0, 41]       # C_t - B t / T  (Gt): min, max, points   (assumed)
+  dev: [-0.12, 0.12, 41]       # log deviation of intensity from trend   (assumed)
+
+# overrides applied with --fast (smoke test sizes, not used for the paper)
+fast:
+  algo: {n_s: 150}
+  dual: {K_nu: 3, n_sim: 400}
+  eval: {n_traj: 400}
+  pareto: {w1: [0.08, 0.20, 0.34]}
+  sens: {eps: [0.0, 0.1], alpha: [0.9], kappa: [0.0, 0.5]}
+  sample: {N: [20, 30], n_records: 2, n_s: [150, 300], n_seeds: 2}
